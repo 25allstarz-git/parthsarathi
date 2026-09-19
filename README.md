@@ -84,19 +84,10 @@ Ensure the demo flows are complete and clickable from entry to outcome.
 
 Before finishing, review every screen for visual consistency, responsive quality, functional routing, and whether it looks like a carefully art-directed legal platform rather than a template.
 
-This project was built with [Lovable](https://lovable.dev).
+## Development
 
-**Live app**: https://nyaya-gateway.lovable.app
+This project is developed locally.
 
-## Build with Lovable
-
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/e6f2aeaa-432a-428c-89da-40499d4aa6e4).
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
-
-## Admin Promotion
 
 Since the admin dashboard cannot be accessed or registered for via the public UI, the first admin must be promoted manually via a SQL query in Supabase.
 
