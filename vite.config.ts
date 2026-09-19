@@ -18,6 +18,9 @@ export default defineConfig({
     }),
     viteReact(),
   ],
+  ssr: {
+    noExternal: ["tslib"],
+  },
   resolve: {
     alias: {
       "@": path.resolve(process.cwd(), "./src")
