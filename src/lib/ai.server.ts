@@ -1,5 +1,5 @@
 /**
- * Server-only helpers that talk to the Lovable AI gateway.
+ * Server-only helpers that talk directly to the Google Generative Language API (Gemini).
  * Every output produced here is assistive and is labelled as such in the UI.
  */
 

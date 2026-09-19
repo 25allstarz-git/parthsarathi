@@ -1,0 +1,1 @@
+var e=[{label:`My matters`,to:`/citizen`},{label:`File a matter`,to:`/citizen/new`},{label:`Find an advocate`,to:`/citizen/lawyers`},{label:`Messages`,to:`/citizen/messages`},{label:`Assistant`,to:`/citizen/assistant`},{label:`Profile`,to:`/citizen/profile`}],t=[{label:`Workspace`,to:`/lawyer`},{label:`Profile`,to:`/lawyer/profile`}];export{t as n,e as t};
