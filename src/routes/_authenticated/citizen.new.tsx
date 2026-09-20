@@ -79,12 +79,17 @@ function NewCasePage() {
           documents,
         },
       });
+      if ('error' in result && result.error === 'AI_BUSY') {
+        throw new Error("The AI analysis engine is currently experiencing high traffic. Please wait a moment and try again.");
+      }
       setStep(PROCESSING_STEPS.length);
       return result;
     },
     onSuccess: (result) => {
-      toast.success(`Matter registered as ${result.caseNumber}`);
-      navigate({ to: "/citizen/case/$caseId", params: { caseId: result.caseId } });
+      if ('caseId' in result) {
+        toast.success(`Matter registered as ${result.caseNumber}`);
+        navigate({ to: "/citizen/case/$caseId", params: { caseId: result.caseId } });
+      }
     },
     onError: (error: Error) => {
       setStep(-1);

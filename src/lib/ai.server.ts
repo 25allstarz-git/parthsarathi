@@ -3,7 +3,8 @@
  * Every output produced here is assistive and is labelled as such in the UI.
  */
 
-const MODEL = process.env["GEMINI_MODEL"] || "gemini-flash-latest";
+const MODEL = process.env["GEMINI_MODEL"] || "gemini-3.5-flash";
+const FALLBACK_MODELS = ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.6-flash"];
 
 type ContentPart =
   | { type: "text"; text: string }
@@ -23,8 +24,6 @@ export class AiUnavailableError extends Error {
 async function chat(messages: ChatMessage[], jsonMode = false): Promise<string> {
   const key = process.env["GEMINI_API_KEY"];
   if (!key) throw new AiUnavailableError("Gemini API key is not configured.", 401);
-
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`;
 
   const contents: any[] = [];
   let systemInstruction: any = undefined;
@@ -65,30 +64,53 @@ async function chat(messages: ChatMessage[], jsonMode = false): Promise<string> 
     contents.push({ role, parts });
   }
 
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents,
-      ...(systemInstruction ? { systemInstruction } : {}),
-      generationConfig: {
-        ...(jsonMode ? { responseMimeType: "application/json" } : {}),
-      },
-    }),
-  });
+  const modelsToTry = Array.from(new Set([MODEL, ...FALLBACK_MODELS]));
+  let lastStatus = 500;
 
-  if (!response.ok) {
-    const detail = await response.text();
-    console.error("Gemini API error", response.status, detail);
-    if (response.status === 429) {
-      throw new AiUnavailableError("AI assistant is temporarily unavailable, please try again shortly.", 429);
+  for (const model of modelsToTry) {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents,
+          ...(systemInstruction ? { systemInstruction } : {}),
+          generationConfig: {
+            ...(jsonMode ? { responseMimeType: "application/json" } : {}),
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const detail = await response.text();
+        console.warn(`Gemini API [${model}] status ${response.status}:`, detail);
+        lastStatus = response.status;
+        if ([404, 429, 503].includes(response.status)) {
+          // Try next model if quota/busy/deprecated
+          continue;
+        }
+        throw new AiUnavailableError("The analysis service could not process this request.", response.status);
+      }
+
+      const payload = await response.json();
+      const text = payload?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+      if (text) {
+        return text;
+      }
+    } catch (err: any) {
+      if (err instanceof AiUnavailableError && ![404, 429, 503].includes(err.status)) {
+        throw err;
+      }
+      console.warn(`Error attempting Gemini model ${model}:`, err?.message || err);
+      lastStatus = err?.status || 500;
     }
-    throw new AiUnavailableError("The analysis service could not process this request.", response.status);
   }
 
-  const payload = await response.json();
-  const text = payload?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-  return text;
+  if (lastStatus === 429) {
+    throw new AiUnavailableError("AI assistant is temporarily unavailable, please try again shortly.", 429);
+  }
+  throw new AiUnavailableError("The analysis service could not process this request.", lastStatus);
 }
 
 export interface AnalysisResult {
@@ -241,7 +263,7 @@ export async function embedText(text: string): Promise<number[]> {
   const key = process.env["GEMINI_API_KEY"];
   if (!key) throw new AiUnavailableError("Gemini API key is not configured.", 401);
 
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${key}`;
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${key}`;
 
   try {
     const response = await fetch(endpoint, {
@@ -249,6 +271,7 @@ export async function embedText(text: string): Promise<number[]> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         content: { parts: [{ text }] },
+        outputDimensionality: 768,
       }),
     });
 

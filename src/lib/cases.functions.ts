@@ -247,30 +247,49 @@ export const createCaseWithAnalysis = createServerFn({ method: "POST" })
 
     let analysis;
     let usedFallback = false;
-    try {
-      analysis = await analyseCase({
-        description: data.description,
-        category: data.category ?? "",
-        documents: data.documents.map((d) => ({
-          file_name: d.fileName,
-          mime_type: d.mimeType ?? "application/octet-stream",
-          ...(d.dataUrl ? { data_url: d.dataUrl } : {}),
-          ...(d.text ? { text: d.text } : {}),
-        })),
-      });
-    } catch (error) {
-      console.warn("Live Gemini analysis unavailable (missing key or offline), using deterministic legal analysis engine:", error);
-      // Deterministic fallback so intake always completes; swap-in point for any provider.
-      const { demoAnalysis } = await import("./demo-analysis.server");
-      analysis = demoAnalysis({
-        description: data.description,
-        ...(data.category ? { category: data.category } : {}),
-        documents: data.documents.map((d) => ({
-          file_name: d.fileName,
-          mime_type: d.mimeType ?? "application/octet-stream",
-        })),
-      });
-      usedFallback = true;
+    
+    let retries = 0;
+    const maxRetries = 3;
+    let backoffTime = 2000;
+    
+    while (true) {
+      try {
+        analysis = await analyseCase({
+          description: data.description,
+          category: data.category ?? "",
+          documents: data.documents.map((d) => ({
+            file_name: d.fileName,
+            mime_type: d.mimeType ?? "application/octet-stream",
+            ...(d.dataUrl ? { data_url: d.dataUrl } : {}),
+            ...(d.text ? { text: d.text } : {}),
+          })),
+        });
+        break; // Success
+      } catch (error: any) {
+        if (error?.status === 429 || error?.status === 503) {
+          if (retries < maxRetries) {
+            console.warn(`Gemini API busy (Status ${error.status}), retrying in ${backoffTime}ms (Attempt ${retries + 1}/${maxRetries})`);
+            await new Promise((resolve) => setTimeout(resolve, backoffTime));
+            backoffTime *= 2;
+            retries++;
+            continue;
+          }
+        }
+        
+        console.warn("Live Gemini analysis unavailable (quota exceeded or offline), using deterministic legal analysis engine:", error);
+        // Deterministic fallback so intake always completes; swap-in point for any provider.
+        const { demoAnalysis } = await import("./demo-analysis.server");
+        analysis = demoAnalysis({
+          description: data.description,
+          ...(data.category ? { category: data.category } : {}),
+          documents: data.documents.map((d) => ({
+            file_name: d.fileName,
+            mime_type: d.mimeType ?? "application/octet-stream",
+          })),
+        });
+        usedFallback = true;
+        break;
+      }
     }
 
     const category = data.category || analysis.category;
@@ -321,7 +340,7 @@ export const createCaseWithAnalysis = createServerFn({ method: "POST" })
       similar_cases: analysis.similar_cases,
       precedents: analysis.precedents,
       recommended_specializations: analysis.recommended_specializations,
-      model: usedFallback ? "nyaysetu/deterministic-analysis-v1" : "google/gemini-3.7-flash",
+      model: usedFallback ? "nyaysetu/deterministic-analysis-v1" : "google/gemini-3.5-flash",
       created_at: new Date().toISOString(),
     };
 
@@ -374,7 +393,7 @@ export const createCaseWithAnalysis = createServerFn({ method: "POST" })
             similar_cases: analysis.similar_cases,
             precedents: analysis.precedents,
             recommended_specializations: analysis.recommended_specializations,
-            model: usedFallback ? "nyaysetu/deterministic-analysis-v1" : "google/gemini-3.7-flash",
+            model: usedFallback ? "nyaysetu/deterministic-analysis-v1" : "google/gemini-3.5-flash",
           });
           
           try {
