@@ -22,7 +22,7 @@ It combines **AI-assisted document analysis, role-based access control, secure c
 
 <br />
 
-**Live Demo:** https://nyaya-gateway.lovable.app
+
 
 </div>
 
